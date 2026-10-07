@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jogo das 3 Pistas - Cursilho Curitiba</title>
+
+  <!-- Favicon oficial: somente o Isótipo, PNG transparente (16, 32 e 180 px) -->
+  <link rel="icon" type="image/png" sizes="32x32" href="cursilho-logo-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="cursilho-logo-16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="cursilho-logo-180.png">
+
+  <!-- Fontes oficiais: Montserrat (até ExtraBold 800), Open Sans e Caveat -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@700&family=Montserrat:wght@400;600;700;800&family=Open+Sans:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <script src="script.js" defer></script>
+</head>
+<body>
+  <div class="spotlight spotlight-left" aria-hidden="true"></div>
+  <div class="spotlight spotlight-right" aria-hidden="true"></div>
+
+  <div class="container">
+    <!-- Cabeçalho: logotipo no canto superior esquerdo, versão colorida sobre fundo branco (Manual de Marca) -->
+    <header class="main-header">
+      <div class="brand-signature">
+        <div class="brand-logo-wrapper">
+          <img src="cursilho-logo.png" alt="Logotipo oficial do MCC Curitiba" class="mcc-logo-img">
+          <div class="brand-text">
+            <span class="brand-name">Movimento de Cursilhos de Cristandade</span>
+            <span class="brand-diocese">Arquidiocese de Curitiba • GED Curitiba</span>
+          </div>
+        </div>
+        <span class="decolores-badge">Decolores!</span>
+      </div>
+
+      <h1 class="game-title">Jogo das 3 Pistas</h1>
+      <p class="subtitle">Evangelizar os ambientes testemunhando a Graça através do conhecimento fraterno</p>
+    </header>
+
+    <!-- Placar -->
+    <section class="scoreboard" aria-label="Placar" aria-live="polite">
+      <div id="card-p1" class="player-card p1 active-turn">
+        <div class="player-name-wrapper">
+          <span id="name-p1" class="player-name">Participante 1</span>
+          <button type="button" class="edit-name-btn" onclick="editPlayerName(1)" title="Editar nome" aria-label="Editar nome do Participante 1">✎</button>
+        </div>
+        <div id="badge-p1" class="turn-badge">Sua Vez de Jogar</div>
+        <div id="score-p1" class="score">00</div>
+      </div>
+
+      <div id="card-p2" class="player-card p2">
+        <div class="player-name-wrapper">
+          <span id="name-p2" class="player-name">Participante 2</span>
+          <button type="button" class="edit-name-btn" onclick="editPlayerName(2)" title="Editar nome" aria-label="Editar nome do Participante 2">✎</button>
+        </div>
+        <div id="badge-p2" class="turn-badge">Aguardando</div>
+        <div id="score-p2" class="score">00</div>
+      </div>
+    </section>
+
+    <!-- Tabuleiro -->
+    <main class="game-board">
+      <div class="board-header">
+        <div class="category-badge" id="category-badge">CATEGORIA: CARREGANDO...</div>
+        <div class="round-indicator" id="round-indicator">RODADA 1</div>
+      </div>
+
+      <div class="clues-wrapper" aria-live="polite">
+        <div id="clue-box-1" class="clue-box revealed">
+          <span class="clue-badge">PISTA 1</span>
+          <span class="clue-text" id="clue-text-1">Aguardando início...</span>
+          <span class="clue-points">10 PTS</span>
+        </div>
+        <div id="clue-box-2" class="clue-box hidden">
+          <span class="clue-badge">PISTA 2</span>
+          <span class="clue-text" id="clue-text-2">Bloqueada</span>
+          <span class="clue-points">9 PTS</span>
+        </div>
+        <div id="clue-box-3" class="clue-box hidden">
+          <span class="clue-badge">PISTA 3</span>
+          <span class="clue-text" id="clue-text-3">Bloqueada</span>
+          <span class="clue-points">8 PTS</span>
+        </div>
+      </div>
+
+      <form class="answer-section" onsubmit="handlePlayerGuess(event)">
+        <label for="guess-input" class="sr-only">Digite a resposta</label>
+        <input type="text" id="guess-input" class="answer-input" placeholder="Digite a resposta correta..." autocomplete="off">
+        <button type="submit" class="btn btn-submit">Validar Palpite</button>
+      </form>
+
+      <!-- Painel do Animador (H = modo apresentação) -->
+      <div class="host-panel" id="host-panel">
+        <div class="host-panel-title">
+          <span>Controle do Animador</span>
+          <span id="current-points-val">VALENDO: 10 PONTOS</span>
+        </div>
+
+        <div class="host-controls">
+          <button type="button" class="btn btn-host-next" onclick="revealNextClue()" title="Atalho: R">🔔 Revelar Pista</button>
+          <button type="button" class="btn btn-host-correct" onclick="judgeRound(true)" title="Atalho: A">✓ Acertou!</button>
+          <button type="button" class="btn btn-host-wrong" onclick="judgeRound(false)" title="Atalho: E">✗ Errou!</button>
+          <button type="button" class="btn btn-host-pass" onclick="switchTurn()" title="Atalho: P">↻ Passar Vez</button>
+        </div>
+
+        <div class="secret-box">
+          <span>Resposta Secreta:
+            <button type="button" id="secret-word-display" class="secret-btn" onclick="toggleSecretBlur()" aria-label="Mostrar ou ocultar a resposta secreta">[Clique para Ver]</button>
+          </span>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="loadNextCard()" title="Atalho: N">Pular Cartão ❯</button>
+        </div>
+        <p class="shortcut-hint">Atalhos: R revelar • A acertou • E errou • P passar • N pular • H modo apresentação</p>
+      </div>
+    </main>
+
+    <div class="bottom-bar">
+      <button type="button" class="btn btn-secondary" onclick="openCustomModal()">+ Nova Pergunta Personalizada</button>
+      <button type="button" class="btn btn-secondary" onclick="togglePresentation()">🖥 Modo Apresentação</button>
+      <button type="button" class="btn btn-secondary" id="mute-btn" onclick="toggleMute()">🔊 Som: ligado</button>
+      <button type="button" class="btn btn-secondary" onclick="resetGame()">Reiniciar Placar</button>
+    </div>
+
+    <!-- Rodapé institucional: fundo Azul Cursilho -->
+    <footer class="site-footer">
+      <div class="footer-logo-plate">
+        <!-- TROCAR pela versão negativa (branca) oficial do GED quando disponível, aplicada direto sobre o azul -->
+        <img src="cursilho-logo.png" alt="Logotipo oficial do MCC Curitiba" class="footer-logo">
+      </div>
+      <div class="footer-brand">
+        <span class="footer-title">Movimento de Cursilhos de Cristandade – Arquidiocese de Curitiba</span>
+        <p class="footer-meta">Grupo Executivo Diocesano (GED Curitiba) • Sede do GED • Curitiba/PR</p>
+        <!-- TODO: incluir o endereço completo da sede do GED -->
+      </div>
+      <div class="footer-links">
+        <!-- TODO: substituir pelos links e contatos oficiais confirmados pelo GED -->
+        <a href="https://www.instagram.com/cursilhocuritiba" class="footer-link" target="_blank" rel="noopener">Instagram: @cursilhocuritiba</a>
+        <a href="mailto:ged@cursilhocuritiba.org.br" class="footer-link">Contato: ged@cursilhocuritiba.org.br</a>
+      </div>
+      <small class="footer-copy">© 2026 MCC Curitiba. Em conformidade com o Manual de Identidade Visual e Marca (GED Curitiba, 2026) e com as diretrizes de acessibilidade WCAG.</small>
+    </footer>
+  </div>
+
+  <!-- Mensagem rápida (substitui alert) -->
+  <div id="toast" class="toast" role="status" aria-live="assertive"></div>
+
+  <!-- Modal de resultado / fim de jogo -->
+  <div class="modal-overlay" id="msg-modal" role="dialog" aria-modal="true" aria-labelledby="msg-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="msg-title">Aviso</h3>
+        <span class="decolores-badge">Decolores!</span>
+      </div>
+      <p id="msg-body" class="msg-body"></p>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-submit" id="msg-ok">Continuar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: nova pergunta -->
+  <div class="modal-overlay" id="custom-modal" role="dialog" aria-modal="true" aria-labelledby="custom-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="custom-title">Nova Carta de Perguntas</h3>
+        <span class="decolores-badge">Decolores!</span>
+      </div>
+      <div class="form-group">
+        <label for="custom-category">Categoria:</label>
+        <input type="text" id="custom-category" placeholder="Ex: Bíblia, História do Cursilho, Igreja...">
+      </div>
+      <div class="form-group">
+        <label for="custom-pista1">Pista 1 (Vale 10 pontos):</label>
+        <input type="text" id="custom-pista1" placeholder="Dica inicial sutil">
+      </div>
+      <div class="form-group">
+        <label for="custom-pista2">Pista 2 (Vale 9 pontos):</label>
+        <input type="text" id="custom-pista2" placeholder="Dica intermediária">
+      </div>
+      <div class="form-group">
+        <label for="custom-pista3">Pista 3 (Vale 8 pontos):</label>
+        <input type="text" id="custom-pista3" placeholder="Dica bem direta">
+      </div>
+      <div class="form-group">
+        <label for="custom-answer">Resposta Correta:</label>
+        <input type="text" id="custom-answer" placeholder="Palavra ou conceito exato">
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" onclick="closeCustomModal()">Cancelar</button>
+        <button type="button" class="btn btn-submit" onclick="saveCustomCard()">Salvar Carta</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
