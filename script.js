@@ -76,28 +76,55 @@ const defaultDeck = [
   }
 ];
 
-const TARGET_SCORE = 50; // pontuação que encerra a partida
+const MAX_TEAMS = 10;
+/* Canal entre a janela do animador e a tela do projetor (projetor.html), mesmo navegador */
+const channel = ('BroadcastChannel' in window) ? new BroadcastChannel('mcc-3pistas') : null;
+function send(msg) { if (channel) channel.postMessage(msg); }
+
+const TEAM_COLORS = ['#66b2ff', '#ff8080', '#5fd698', '#ffb366', '#c3a6ff', '#ff9ed2', '#7fe0e0', '#e6e67f', '#b0c9e2', '#ffa07a'];
 const STORAGE_KEY = 'mcc-curitiba-3-pistas';
 
 let customCards = [];
 let gameDeck = [...defaultDeck];
 let currentCardIndex = 0;
 let revealedCluesCount = 1;
-let activePlayer = 1;
-let scores = { 1: 0, 2: 0 };
-let names = { 1: 'Participante 1', 2: 'Participante 2' };
+let teams = [{ name: 'Equipe 1', score: 0 }, { name: 'Equipe 2', score: 0 }];
+let activeTeam = 0;
+let targetScore = 50; // pontuação que encerra a partida
 let roundCounter = 1;
 let roundLocked = false;
 let failsOnLast = 0;
 let nextTimer = null;
 let muted = false;
 
+function buildState() {
+  const card = gameDeck[currentCardIndex];
+  return {
+    category: card.categoria,
+    round: roundCounter,
+    points: getCurrentPoints(),
+    clues: card.pistas.map((p, i) => (i < revealedCluesCount ? p : null)), // nunca envia a resposta
+    teams: teams.map(t => ({ name: t.name, score: t.score })),
+    active: activeTeam
+  };
+}
+
+function broadcastState() {
+  if (channel && gameDeck[currentCardIndex]) send({ type: 'state', state: buildState() });
+}
+
+if (channel) channel.onmessage = (e) => { if (e.data && e.data.type === 'request') broadcastState(); };
+
+function openProjector() {
+  window.open('projetor.html', 'mcc-projetor', 'popup,width=1280,height=720');
+}
+
 /* ============================================================
    PERSISTÊNCIA (localStorage)
    ============================================================ */
 function saveState() {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ scores, names, customCards, muted }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ teams, activeTeam, targetScore, customCards, muted }));
   } catch (e) { /* armazenamento indisponível: segue sem salvar */ }
 }
 
@@ -105,14 +132,13 @@ function loadState() {
   try {
     const data = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
     if (!data) return;
-    if (data.scores) scores = data.scores;
-    if (data.names) names = data.names;
+    if (Array.isArray(data.teams) && data.teams.length >= 2) teams = data.teams;
+    if (Number.isInteger(data.activeTeam) && data.activeTeam < teams.length) activeTeam = data.activeTeam;
+    if (data.targetScore) targetScore = data.targetScore;
     if (Array.isArray(data.customCards)) customCards = data.customCards;
     muted = !!data.muted;
   } catch (e) { /* dados inválidos: ignora */ }
   gameDeck = [...customCards, ...defaultDeck];
-  document.getElementById('name-p1').textContent = names[1];
-  document.getElementById('name-p2').textContent = names[2];
   updateMuteButton();
 }
 
@@ -174,7 +200,8 @@ function updateMuteButton() {
    ============================================================ */
 let toastTimer = null;
 
-function showToast(text, ms = 2500) {
+function showToast(text, ms = 2500, toScreen = false) {
+  if (toScreen) send({ type: 'toast', text, ms });
   const el = document.getElementById('toast');
   el.textContent = text;
   el.classList.add('show');
@@ -198,10 +225,11 @@ function closeModal(id) {
 }
 
 function showMessage(title, body, onOk) {
+  send({ type: 'message', title, body });
   document.getElementById('msg-title').textContent = title;
   document.getElementById('msg-body').textContent = body;
   const ok = document.getElementById('msg-ok');
-  ok.onclick = () => { closeModal('msg-modal'); if (onOk) onOk(); };
+  ok.onclick = () => { closeModal('msg-modal'); send({ type: 'clear' }); if (onOk) onOk(); };
   openModal('msg-modal');
 }
 
@@ -247,6 +275,7 @@ function loadCard(index) {
   input.value = '';
   // Em celulares, evita abrir o teclado a cada rodada
   if (!window.matchMedia('(pointer: coarse)').matches) input.focus();
+  broadcastState();
 }
 
 function setClueState(num, isRevealed) {
@@ -264,6 +293,7 @@ function revealNextClue() {
     setClueState(revealedCluesCount, true);
     playSound('clue');
     updatePointsBadge();
+    broadcastState();
   } else {
     showToast('Todas as 3 pistas já foram apresentadas nesta rodada!');
   }
@@ -278,19 +308,46 @@ function updatePointsBadge() {
 }
 
 function switchTurn() {
-  activePlayer = activePlayer === 1 ? 2 : 1;
+  activeTeam = (activeTeam + 1) % teams.length;
   updateScoreboard();
 }
 
 function updateScoreboard() {
-  document.getElementById('score-p1').textContent = scores[1].toString().padStart(2, '0');
-  document.getElementById('score-p2').textContent = scores[2].toString().padStart(2, '0');
+  const board = document.getElementById('scoreboard');
+  board.classList.toggle('many', teams.length > 4);
+  board.innerHTML = '';
+  teams.forEach((team, i) => {
+    const active = i === activeTeam;
+    const card = document.createElement('div');
+    card.className = 'player-card' + (active ? ' active-turn' : '');
 
-  const p1Active = activePlayer === 1;
-  document.getElementById('card-p1').classList.toggle('active-turn', p1Active);
-  document.getElementById('card-p2').classList.toggle('active-turn', !p1Active);
-  document.getElementById('badge-p1').textContent = p1Active ? 'Sua Vez de Jogar' : 'Aguardando';
-  document.getElementById('badge-p2').textContent = p1Active ? 'Aguardando' : 'Sua Vez de Jogar';
+    const wrap = document.createElement('div');
+    wrap.className = 'player-name-wrapper';
+    const name = document.createElement('span');
+    name.className = 'player-name';
+    name.style.color = TEAM_COLORS[i % TEAM_COLORS.length];
+    name.textContent = team.name;
+    const edit = document.createElement('button');
+    edit.type = 'button';
+    edit.className = 'edit-name-btn';
+    edit.textContent = '✎';
+    edit.title = 'Editar nome';
+    edit.setAttribute('aria-label', `Editar nome de ${team.name}`);
+    edit.onclick = () => editTeamName(i);
+    wrap.append(name, edit);
+
+    const badge = document.createElement('div');
+    badge.className = 'turn-badge';
+    badge.textContent = active ? 'Sua Vez de Jogar' : 'Aguardando';
+
+    const score = document.createElement('div');
+    score.className = 'score';
+    score.textContent = team.score.toString().padStart(2, '0');
+
+    card.append(wrap, badge, score);
+    board.appendChild(card);
+  });
+  broadcastState();
 }
 
 function scheduleNextCard(ms) {
@@ -305,8 +362,9 @@ function judgeRound(isCorrect) {
   if (isCorrect) {
     roundLocked = true;
     const pts = getCurrentPoints();
-    scores[activePlayer] += pts;
+    teams[activeTeam].score += pts;
     playSound('correct');
+    send({ type: 'confetti' });
 
     if (typeof confetti === 'function' && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
       confetti({
@@ -319,17 +377,17 @@ function judgeRound(isCorrect) {
 
     updateScoreboard();
     saveState();
-    const playerName = names[activePlayer];
+    const playerName = teams[activeTeam].name;
 
-    if (scores[activePlayer] >= TARGET_SCORE) {
+    if (teams[activeTeam].score >= targetScore) {
       setTimeout(() => showMessage(
         '🏆 Temos um vencedor!',
-        `DECOLORES! ${playerName} chegou a ${scores[activePlayer]} pontos e venceu a partida!`,
+        `DECOLORES! ${playerName} chegou a ${teams[activeTeam].score} pontos e venceu a partida!`,
         newMatch
       ), 600);
     } else {
-      showToast(`🎉 DECOLORES! ${playerName} acertou e somou ${pts} pontos!`, 2200);
-      scheduleNextCard(2400);
+      showToast(`🎉 DECOLORES! ${playerName} acertou e somou ${pts} pontos! Resposta: ${card.resposta}`, 2800, true);
+      scheduleNextCard(3000);
     }
   } else {
     playSound('wrong');
@@ -338,9 +396,9 @@ function judgeRound(isCorrect) {
       switchTurn();
     } else {
       failsOnLast++;
-      if (failsOnLast >= 2) {
+      if (failsOnLast >= teams.length) {
         roundLocked = true;
-        showToast(`Ninguém acertou desta vez. A resposta era: ${card.resposta}`, 3200);
+        showToast(`Ninguém acertou desta vez. A resposta era: ${card.resposta}`, 3200, true);
         scheduleNextCard(3400);
       } else {
         switchTurn();
@@ -411,21 +469,77 @@ function toggleSecretBlur() {
   el.style.filter = el.style.filter === 'none' ? 'blur(5px)' : 'none';
 }
 
-function editPlayerName(playerNum) {
-  const novo = prompt(`Nome do Participante ${playerNum}:`, names[playerNum]);
+function editTeamName(i) {
+  const novo = prompt(`Nome da equipe ${i + 1}:`, teams[i].name);
   if (novo && novo.trim() !== '') {
-    names[playerNum] = novo.trim().slice(0, 24);
-    document.getElementById(`name-p${playerNum}`).textContent = names[playerNum];
+    teams[i].name = novo.trim().slice(0, 24);
+    updateScoreboard();
     saveState();
   }
 }
 
 function newMatch() {
   clearTimeout(nextTimer);
-  scores = { 1: 0, 2: 0 };
+  teams.forEach(t => { t.score = 0; });
+  activeTeam = 0;
   roundCounter = 1;
   saveState();
   initGame();
+}
+
+/* ============================================================
+   CONFIGURAÇÃO DE EQUIPES
+   ============================================================ */
+function openTeamsModal() {
+  const select = document.getElementById('teams-count');
+  if (!select.options.length) {
+    for (let n = 2; n <= MAX_TEAMS; n++) select.add(new Option(`${n} equipes`, n));
+  }
+  select.value = teams.length;
+  document.getElementById('target-input').value = targetScore;
+  renderTeamInputs(teams.map(t => t.name));
+  openModal('teams-modal');
+}
+
+function renderTeamInputs(currentNames) {
+  const box = document.getElementById('teams-names');
+  const n = parseInt(document.getElementById('teams-count').value, 10);
+  const keep = Array.isArray(currentNames)
+    ? currentNames
+    : [...box.querySelectorAll('input')].map(i => i.value);
+  box.innerHTML = '';
+  for (let i = 0; i < n; i++) {
+    const g = document.createElement('div');
+    g.className = 'form-group';
+    const l = document.createElement('label');
+    l.htmlFor = `team-name-${i}`;
+    l.textContent = `Equipe ${i + 1}:`;
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    inp.id = `team-name-${i}`;
+    inp.maxLength = 24;
+    inp.value = keep[i] || `Equipe ${i + 1}`;
+    g.append(l, inp);
+    box.appendChild(g);
+  }
+}
+
+function applyTeams() {
+  const n = parseInt(document.getElementById('teams-count').value, 10);
+  const target = parseInt(document.getElementById('target-input').value, 10);
+  if (!(target >= 10 && target <= 500)) {
+    showToast('Informe uma pontuação entre 10 e 500.');
+    return;
+  }
+  teams = [];
+  for (let i = 0; i < n; i++) {
+    const v = document.getElementById(`team-name-${i}`).value.trim();
+    teams.push({ name: v || `Equipe ${i + 1}`, score: 0 });
+  }
+  targetScore = target;
+  closeModal('teams-modal');
+  newMatch();
+  showToast(`${n} equipes prontas. Boa partida! Decolores!`, 2500, true);
 }
 
 function resetGame() {
@@ -445,14 +559,14 @@ function togglePresentation() {
 document.addEventListener('keydown', (e) => {
   const openModalEl = document.querySelector('.modal-overlay.active');
 
-  if (e.key === 'Escape' && openModalEl && openModalEl.id === 'custom-modal') {
-    closeCustomModal();
+  if (e.key === 'Escape' && openModalEl && openModalEl.id !== 'msg-modal') {
+    closeModal(openModalEl.id);
     return;
   }
 
   // Mantém o foco dentro do modal aberto
   if (e.key === 'Tab' && openModalEl) {
-    const items = [...openModalEl.querySelectorAll('input, button')];
+    const items = [...openModalEl.querySelectorAll('input, select, button')];
     const first = items[0], last = items[items.length - 1];
     if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
     else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }

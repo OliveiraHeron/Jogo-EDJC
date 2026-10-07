@@ -9,14 +9,10 @@
   <link rel="icon" type="image/png" sizes="32x32" href="cursilho-logo-32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="cursilho-logo-16.png">
   <link rel="apple-touch-icon" sizes="180x180" href="cursilho-logo-180.png">
-
-  <!-- Fontes oficiais: Montserrat (até ExtraBold 800), Open Sans e Caveat -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@700&family=Montserrat:wght@400;600;700;800&family=Open+Sans:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="fonts.css">
 
   <link rel="stylesheet" href="style.css">
-  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <script src="vendor/confetti.browser.js"></script>
   <script src="script.js" defer></script>
 </head>
 <body>
@@ -41,26 +37,8 @@
       <p class="subtitle">Evangelizar os ambientes testemunhando a Graça através do conhecimento fraterno</p>
     </header>
 
-    <!-- Placar -->
-    <section class="scoreboard" aria-label="Placar" aria-live="polite">
-      <div id="card-p1" class="player-card p1 active-turn">
-        <div class="player-name-wrapper">
-          <span id="name-p1" class="player-name">Participante 1</span>
-          <button type="button" class="edit-name-btn" onclick="editPlayerName(1)" title="Editar nome" aria-label="Editar nome do Participante 1">✎</button>
-        </div>
-        <div id="badge-p1" class="turn-badge">Sua Vez de Jogar</div>
-        <div id="score-p1" class="score">00</div>
-      </div>
-
-      <div id="card-p2" class="player-card p2">
-        <div class="player-name-wrapper">
-          <span id="name-p2" class="player-name">Participante 2</span>
-          <button type="button" class="edit-name-btn" onclick="editPlayerName(2)" title="Editar nome" aria-label="Editar nome do Participante 2">✎</button>
-        </div>
-        <div id="badge-p2" class="turn-badge">Aguardando</div>
-        <div id="score-p2" class="score">00</div>
-      </div>
-    </section>
+    <!-- Placar (gerado pelo script conforme o número de equipes) -->
+    <section class="scoreboard" id="scoreboard" aria-label="Placar" aria-live="polite"></section>
 
     <!-- Tabuleiro -->
     <main class="game-board">
@@ -118,6 +96,8 @@
     </main>
 
     <div class="bottom-bar">
+      <button type="button" class="btn btn-secondary" onclick="openProjector()">📺 Abrir Tela do Projetor</button>
+      <button type="button" class="btn btn-secondary" onclick="openTeamsModal()">⚙ Equipes</button>
       <button type="button" class="btn btn-secondary" onclick="openCustomModal()">+ Nova Pergunta Personalizada</button>
       <button type="button" class="btn btn-secondary" onclick="togglePresentation()">🖥 Modo Apresentação</button>
       <button type="button" class="btn btn-secondary" id="mute-btn" onclick="toggleMute()">🔊 Som: ligado</button>
@@ -161,6 +141,30 @@
     </div>
   </div>
 
+  <!-- Modal: configurar equipes -->
+  <div class="modal-overlay" id="teams-modal" role="dialog" aria-modal="true" aria-labelledby="teams-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="teams-title">Configurar Equipes</h3>
+        <span class="decolores-badge">Decolores!</span>
+      </div>
+      <div class="form-group">
+        <label for="teams-count">Quantidade de equipes:</label>
+        <select id="teams-count" onchange="renderTeamInputs()"></select>
+      </div>
+      <div id="teams-names" class="teams-names"></div>
+      <div class="form-group">
+        <label for="target-input">Pontos para vencer a partida:</label>
+        <input type="number" id="target-input" min="10" max="500" step="5">
+      </div>
+      <p class="shortcut-hint">Aplicar zera o placar. As equipes jogam em rodízio, uma por vez.</p>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('teams-modal')">Cancelar</button>
+        <button type="button" class="btn btn-submit" onclick="applyTeams()">Aplicar e Reiniciar</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal: nova pergunta -->
   <div class="modal-overlay" id="custom-modal" role="dialog" aria-modal="true" aria-labelledby="custom-title">
     <div class="modal-card">
@@ -194,5 +198,6 @@
       </div>
     </div>
   </div>
+  <script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(function(){});</script>
 </body>
 </html>

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex">
+  <title>Tela do Projetor - Jogo das 3 Pistas</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="cursilho-logo-32.png">
+  <link rel="stylesheet" href="fonts.css">
+  <link rel="stylesheet" href="projetor.css">
+  <script src="vendor/confetti.browser.js"></script>
+  <script src="projetor.js" defer></script>
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <img src="cursilho-logo.png" alt="Logotipo oficial do MCC Curitiba" class="logo">
+      <div class="brand-text">
+        <span class="brand-name">Movimento de Cursilhos de Cristandade</span>
+        <span class="brand-diocese">Arquidiocese de Curitiba • GED Curitiba</span>
+      </div>
+    </div>
+    <h1 class="title">Jogo das 3 Pistas</h1>
+    <span class="decolores">Decolores!</span>
+  </header>
+
+  <main class="stage">
+    <div class="meta">
+      <span class="chip" id="category">CATEGORIA</span>
+      <span class="chip chip-gold" id="points">VALENDO: 10 PONTOS</span>
+      <span class="chip chip-soft" id="round">RODADA 1</span>
+    </div>
+    <div class="clues" aria-live="polite">
+      <div class="clue hidden" id="clue-0"><span class="badge">PISTA 1</span><span class="text">—</span><span class="pts">10 PTS</span></div>
+      <div class="clue hidden" id="clue-1"><span class="badge">PISTA 2</span><span class="text">—</span><span class="pts">9 PTS</span></div>
+      <div class="clue hidden" id="clue-2"><span class="badge">PISTA 3</span><span class="text">—</span><span class="pts">8 PTS</span></div>
+    </div>
+  </main>
+
+  <section class="board" id="board" aria-label="Placar" aria-live="polite"></section>
+
+  <div class="overlay show" id="overlay" role="status" aria-live="assertive">
+    <div class="overlay-card">
+      <h2 id="overlay-title"></h2>
+      <p id="overlay-text">Aguardando o animador… Decolores!</p>
+    </div>
+  </div>
+  <script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(function(){});</script>
+</body>
+</html>
